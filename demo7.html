@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div id="content"></div>
+  <script>
+    /*
+      7.service worker onfetch demo，需要域名是localhost或者https才能启用
+    */
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.register('./service-worker.js')
+      const div = document.querySelector('#content')
+      fetch("https://mobile-ms.uat.homecreditcfc.cn/mock/631335604fab890028c57e8b/scoyzhao/test") // 测试接口，返回 { "data": "Hello World!" }
+        .then(res => {
+          const reader = res.body.getReader()
+          return reader
+        })
+        .then(print)
+    } else {
+      alert('浏览器不支持 service worker')
+    }
+
+    let text = ''
+    function print(reader) {
+      return reader.read()
+        .then(({ value, done }) => {
+          if (done) {
+            console.log('complete', text)
+            return
+          } else {
+            const decoder = new TextDecoder('utf-8');
+            text += decoder.decode(value, { stream: true })
+            console.log("🚀 ~ file: service-worker.js ~ line 23 ~ reader.read ~ text", text)
+            document.querySelector('#content').innerHTML = value
+            print(reader)
+          }
+        })
+    }
+  </script>
+</body>
+
+</html>

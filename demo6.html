@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<div id="process"></div>
+<img src="" alt="暂无" width="300px" height="300px">
+<button id="btn"></button>
+
+<body>
+  <script>
+    /**
+       * 5.中断
+       * */
+    const tip = document.querySelector('#process')
+    const img = document.querySelector('img')
+    const btn = document.querySelector('#btn')
+    btn.innerHTML = 'download'
+    btn.addEventListener('click', () => {
+      if (btn.innerHTML === 'download') {
+        download()
+      } else {
+        pause()
+      }
+    })
+
+    // server支持断点续传的
+    const url = 'https://objectstorage.ap-tokyo-1.oraclecloud.com/p/NdUkEhIYzjlI_H_9RRUeDb5pSym8geoWJ0hRVNctCEY/n/nrzblovvku9x/b/bucket-ccloli/o/adorable-animal-cat-730896.jpg'
+    // 不支持的
+    // const url = 'http://e.hiphotos.baidu.com/image/pic/item/a1ec08fa513d2697e542494057fbb2fb4316d81e.jpg'
+
+    let content = null
+    let length = 0
+    let total = 0
+    let acl
+    let chunk = []
+
+    function logProcess(reader) {
+      const stream = new ReadableStream({
+        start(controller) {
+          let aborted = false;
+          const loadStream = () => {
+            reader.read()
+              .then(({ value, done }) => {
+                if (done) {
+                  console.log('complete')
+                  tip.innerHTML = 'complete'
+                  while (chunk.length > 0) {
+                    const data = chunk.shift()
+                    controller.enqueue(data)
+                  }
+                  controller.close();
+                } else {
+                  // res为uint8Array的数据
+                  length += value.length
+                  console.log(`----- this time download ${value.length}, had downloaded ${length / total}`)
+                  tip.innerHTML = `----- this time download ${value.length}, had downloaded ${length / total}`
+                  chunk.push(value)
+                  loadStream()
+                }
+              })
+          }
+          loadStream()
+        }
+      })
+
+      return new Response(stream)
+    }
+
+    function download() {
+      btn.innerHTML = 'pause'
+      acl = new AbortController()
+      const signal = acl.signal
+      const headers = length === 0? undefined: { 'Range': `bytes=${length}-` }
+      fetch(url, {
+        headers,
+        signal,
+      })
+        .then(res => {
+          if (length === 0) {
+            total = res.headers.get('content-length')
+          } else if (total === res.headers.get('content-length')) {
+            console.log('not support')
+            this.reset()
+          }
+
+          console.log(`-----total is ${total}`)
+          const reader = res.body.getReader()
+          return reader
+        })
+        .then(logProcess)
+        .then(resp => {
+          console.log(`resp is ${resp}`)
+          return resp.blob()
+        })
+        .then(src => {
+          const imageObjectURL = URL.createObjectURL(src);
+          console.log(`src is ${imageObjectURL}`)
+          img.src = imageObjectURL
+        })
+    }
+
+    function pause() {
+      btn.innerHTML = 'download'
+      acl.abort()
+    }
+
+    function reset() {
+      chunk = []
+      chunk.fill
+      length = 0
+    }
+
+  </script>
+</body>
+
+</html>
